@@ -131,7 +131,7 @@ const VIDEO_DOMAIN = 'meet.jit.si';
 const VIDEO_MODE = 'p2p';
 /* Для P2P: при строгих сетях (часть мобильных операторов, корпоративные сети) нужен TURN-сервер.
    Пример: { urls: 'turn:turn.example.com:3478', username: 'user', credential: 'pass' } */
-const TURN_SERVERS = [{ urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }, { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' }];
+const TURN_SERVERS = [];
 /* Свой сервер сигналов PeerJS (необязательно): { host: 'peer.example.com', port: 443, secure: true, path: '/' } */
 const PEER_SERVER = { host: location.hostname, port: location.port ? +location.port : 443, path: '/peerjs', secure: location.protocol === 'https:' };
 
@@ -247,9 +247,9 @@ function startP2P(name) {
   const box = $('#video');
   $('#vph').hidden = true;
   box.insertAdjacentHTML('beforeend', '<div class="vwrap"><video id="rv" autoplay playsinline></video><video id="lv" autoplay playsinline muted></video><div id="vst">Подключаю камеру…</div><div id="vc"><button id="bm" title="Микрофон">🎤</button><button id="bc" title="Камера">📷</button></div></div>');
-  const info = { role: '-', sig: 'нет', ice: '-' };
+  const info = { role: '-', sig: 'нет', ice: '-', turn: 0 };
   let stext = '';
-  const st = t => { if (t != null) stext = t; $('#vst').textContent = stext + '\n[комната …' + r.slice(-4) + ' · роль ' + info.role + ' · сервер: ' + info.sig + ' · канал: ' + info.ice + ']'; };
+  const st = t => { if (t != null) stext = t; $('#vst').textContent = stext + '\n[комната …' + r.slice(-4) + ' · роль ' + info.role + ' · сервер: ' + info.sig + ' · канал: ' + info.ice + ' · TURN: ' + (info.turn ? 'есть' : 'нет') + ']'; };
   const s = document.createElement('script');
   s.src = 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
   s.onerror = () => st('Не удалось загрузить видеосвязь. Проверь интернет и обнови страницу.');
@@ -313,7 +313,8 @@ function startP2P(name) {
       });
       peer.on('disconnected', () => { info.sig = 'обрыв'; st(); try { peer.reconnect(); } catch (e) {} });
     };
-    start(r + '-a');
+    if (q.get('relay')) ice.iceTransportPolicy = 'relay';
+    fetch('/turn.json').then(x => x.ok ? x.json() : []).then(list => { if (Array.isArray(list) && list.length) { ice.iceServers.push(...list); info.turn = list.length; } }).catch(() => {}).then(() => start(r + '-a'));
     addEventListener('beforeunload', () => { dead = true; try { peer.destroy(); } catch (e) {} });
   };
   document.head.append(s);
