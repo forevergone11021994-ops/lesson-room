@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Комната урока</title>
+<style>
+:root{--bg:#10142b;--bar:#1a2048;--ink:#eef1ff;--mut:#9aa3d6;--acc:#5b7cff;--ok:#2fbf71;--card:#fff;--cardink:#1b2340;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+[hidden]{display:none!important}
+button{font:inherit;cursor:pointer}
+.btn{border:0;border-radius:10px;padding:10px 16px;background:var(--acc);color:#fff;font-weight:700}
+.btn.sec{background:#2a3270}
+.btn.ok{background:var(--ok)}
+input,textarea{font:inherit;width:100%;padding:10px 12px;border-radius:10px;border:2px solid #39428a;background:#0c1024;color:var(--ink)}
+input:focus,textarea:focus{outline:none;border-color:var(--acc)}
+
+/* ---------- teacher setup ---------- */
+#setup{max-width:640px;margin:0 auto;padding:28px max(16px,env(safe-area-inset-right)) 40px max(16px,env(safe-area-inset-left))}
+#setup h1{font-size:26px;margin:0 0 6px}
+#setup p{color:var(--mut);margin:0 0 18px}
+.field{margin:0 0 16px}
+.field label{display:block;font-weight:700;margin-bottom:6px}
+.hint{color:var(--mut);font-size:14px;margin-top:6px}
+.out{background:#0c1024;border:2px dashed #39428a;border-radius:12px;padding:12px;word-break:break-all;margin:10px 0}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.err{color:#ff8a8a;font-weight:600;margin-top:8px}
+
+/* ---------- student gate ---------- */
+#gate{min-height:100%;display:grid;place-items:center;padding:20px}
+.gbox{background:var(--bar);border-radius:18px;padding:26px;max-width:420px;width:100%;box-shadow:0 10px 40px #0008}
+.gbox h1{margin:0 0 6px;font-size:24px}
+.gbox p{color:var(--mut);margin:0 0 16px}
+
+/* ---------- room ---------- */
+#room{height:100%;display:flex;flex-direction:column}
+#bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px max(12px,env(safe-area-inset-right)) 8px max(12px,env(safe-area-inset-left));padding-top:max(8px,env(safe-area-inset-top));background:var(--bar)}
+#bar b{margin-right:auto}
+#bar .btn{padding:7px 12px;font-size:14px}
+#bar .btn.on{background:var(--ok)}
+#stage{flex:1;min-height:0;display:grid;gap:8px;padding:8px max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left))}
+#stage.side{grid-template-columns:1fr var(--vw,340px)}
+#stage.bottom{grid-template-rows:1fr var(--vh,38%)}
+#stage.hide{grid-template-columns:1fr}
+#board,#video{background:#fff;border-radius:12px;overflow:hidden;position:relative;min-width:0;min-height:0}
+#board iframe{width:100%;height:100%;border:0;display:block}
+#video{background:#0c1024}
+#video .ph{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:16px;color:var(--mut)}
+#stage.hide #video{display:none}
+#video .vwrap{position:absolute;inset:0}
+#stage.float #video .vwrap{top:22px}
+#rv{width:100%;height:100%;object-fit:contain;background:#05070f;display:block}
+#lv{position:absolute;right:8px;bottom:56px;width:30%;max-width:160px;border-radius:10px;border:2px solid #fff6;background:#000;transform:scaleX(-1);object-fit:cover;aspect-ratio:4/3}
+#vc{position:absolute;left:0;right:0;bottom:8px;display:flex;gap:8px;justify-content:center}
+#vc button{width:44px;height:44px;border-radius:50%;border:0;background:#2a3270;color:#fff;font-size:20px}
+#vc button.off{background:#c0392b}
+#vst{white-space:pre-line;position:absolute;left:10px;top:8px;right:10px;font-size:13px;color:#cfd6ff;text-shadow:0 1px 3px #000}
+/* floating */
+#stage.float{grid-template-columns:1fr}
+#stage.float #video{position:fixed;right:16px;bottom:16px;width:340px;height:260px;min-width:200px;min-height:150px;resize:both;z-index:20;box-shadow:0 10px 36px #000a;border:2px solid var(--acc)}
+#grip{display:none;position:absolute;left:0;top:0;right:0;height:22px;background:var(--acc);cursor:move;z-index:3;touch-action:none;text-align:center;font-size:12px;line-height:22px;color:#fff}
+#stage.float #grip{display:block}
+#stage.float #video iframe{margin-top:22px;height:calc(100% - 22px)!important}
+@media (max-width:800px){
+  #stage.side{grid-template-columns:1fr;grid-template-rows:1fr var(--vh,38%)}
+  #stage.float #video{width:55vw;height:34vh}
+}
+</style></head>
+<body>
+
+<!-- Teacher: build links -->
+<section id="setup" hidden>
+  <h1>Комната урока</h1>
+  <p>Доска Holst и видеосвязь на одной странице. Ученик открывает одну ссылку, ничего не устанавливает.</p>
+  <div class="field">
+    <label for="boardIn">1. Доска Holst</label>
+    <textarea id="boardIn" rows="3" placeholder="Вставь ссылку или весь код из Holst: Поделиться → Встроить"></textarea>
+    <div class="hint">В Holst: доска → «Поделиться» → вкладка «Встроить» → «Скопировать код». Подойдёт и код целиком, и ссылка вида app.holst.so/share/b/…</div>
+  </div>
+  <div class="field">
+    <label for="roomIn">2. Имя видеокомнаты</label>
+    <input id="roomIn" autocomplete="off" spellcheck="false">
+    <div class="hint">Подставлено случайное, его не угадать. Для каждого ученика лучше своя комната и своя доска.</div>
+  </div>
+  <div class="field">
+    <label for="who">3. Название урока (необязательно)</label>
+    <input id="who" autocomplete="off" placeholder="Например: English with Anastasia">
+<label style="display:block;margin-top:10px">Ссылка на Zoom (или другую видеокомнату)</label><input id="vIn" placeholder="https://us05web.zoom.us/j/…" style="width:100%"><label style="display:block;margin-top:10px">Или адрес Jitsi-сервера для видео в странице</label><input id="jIn" placeholder="например: meet.ffmuc.net" style="width:100%">
+  </div>
+  <div class="row"><button class="btn" id="mk">Сделать ссылку</button><button class="btn sec" id="rnd">Новая комната</button></div>
+  <div class="err" id="err"></div>
+  <div id="res" hidden>
+    <div class="out" id="studentLink"></div>
+    <div class="row"><button class="btn ok" id="cp">Скопировать ссылку для ученика</button><button class="btn sec" id="open">Открыть самой</button></div>
+    <div class="hint">Эта ссылка постоянная: отправь её ученику один раз, и каждый урок он заходит по ней. Файл можно хранить где угодно, но для камеры и микрофона он должен лежать на сайте с адресом https:// (подробнее в инструкции).</div>
+  </div>
+</section>
+
+<!-- Student: ask name, then start -->
+<section id="gate" hidden>
+  <div class="gbox">
+    <h1 id="gtitle">Привет!</h1>
+    <p>Напиши своё имя и нажми кнопку. Браузер спросит про камеру и микрофон: нажми «Разрешить».</p>
+    <div class="field"><label for="nm">Как тебя зовут?</label><input id="nm" autocomplete="given-name" maxlength="40"></div>
+    <button class="btn ok" id="go" style="width:100%;padding:14px;font-size:18px">Войти в урок</button>
+    <div class="err" id="gerr"></div>
+  </div>
+</section>
+
+<!-- Room -->
+<section id="room" hidden>
+  <div id="bar">
+    <b id="rt">Урок</b>
+    <button class="btn sec" data-l="side">Видео справа</button>
+    <button class="btn sec" data-l="bottom">Видео снизу</button>
+    <button class="btn sec" data-l="float">Видео окном</button>
+    <button class="btn sec" data-l="hide">Скрыть видео</button>
+    <button class="btn sec" id="wider" title="Шире или уже">↔</button>
+    <a class="btn sec" id="ob" target="_blank" rel="noopener" style="text-decoration:none">Доска отдельно</a><button class="btn sec" id="fsb" aria-label="Полный экран">⛶</button>
+  </div>
+  <div id="stage" class="side">
+    <div id="board"></div>
+    <div id="video"><div id="grip">перетащи за эту полосу</div><div class="ph" id="vph">Подключаю видео…</div></div>
+  </div>
+</section>
+
+<script>
+/* Видеосервер. Можно заменить на свой сервер Jitsi: 'jitsi.example.com' */
+const VIDEO_DOMAIN = 'meet.jit.si';
+/* Режим видео: 'p2p' (звонок напрямую, без лимитов, для 1 на 1) или 'jitsi'. Можно переопределить в ссылке: &m=jitsi */
+const VIDEO_MODE = 'p2p';
+/* Для P2P: при строгих сетях (часть мобильных операторов, корпоративные сети) нужен TURN-сервер.
+   Пример: { urls: 'turn:turn.example.com:3478', username: 'user', credential: 'pass' } */
+const TURN_SERVERS = [{ urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }, { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' }];
+/* Свой сервер сигналов PeerJS (необязательно): { host: 'peer.example.com', port: 443, secure: true, path: '/' } */
+const PEER_SERVER = { host: location.hostname, port: location.port ? +location.port : 443, path: '/peerjs', secure: location.protocol === 'https:' };
+
+const $ = s => document.querySelector(s);
+const q = new URLSearchParams(location.search);
+const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+const rand = n => { const a = new Uint8Array(n); crypto.getRandomValues(a); return [...a].map(x => 'abcdefghjkmnpqrstuvwxyz23456789'[x % 31]).join(''); };
+const safe = s => (s || '').replace(/[^\w\-]/g, '').slice(0, 60);
+
+const b = q.get('b'), r = q.get('r');
+if (b && UUID.test(b) && r) initStudent(); else initSetup();
+
+/* ---------- teacher ---------- */
+function initSetup() {
+  $('#setup').hidden = false;
+  const room = $('#roomIn'); room.value = 'english-' + rand(10);
+  $('#rnd').onclick = () => room.value = 'english-' + rand(10);
+  const build = () => {
+    $('#err').textContent = '';
+    const m = $('#boardIn').value.match(UUID);
+    if (!m) { $('#err').textContent = 'Не нашла ссылку на доску. Скопируй код из Holst: Поделиться → Встроить.'; return null; }
+    const rn = safe(room.value) || 'english-' + rand(10);
+    const p = new URLSearchParams({ b: m[0], r: rn });
+    if ($('#who').value.trim()) p.set('t', $('#who').value.trim().slice(0, 60));
+    const vm = ($('#vIn').value || '').match(/https:\/\/[^\s"'<>]+/); if (vm) p.set('v', vm[0]);
+    const jv = ($('#jIn').value || '').trim().replace(/^https?:\/\//,'').replace(/\/.*$/,''); if (jv) p.set('j', jv);
+    return location.origin === 'null' || location.protocol === 'file:' ? location.href.split('?')[0] + '?' + p : location.origin + location.pathname + '?' + p;
+  };
+  let link = '';
+  $('#mk').onclick = () => { link = build(); if (!link) return; $('#studentLink').textContent = link; $('#res').hidden = false; };
+  $('#cp').onclick = async () => { if (!link) return; try { await navigator.clipboard.writeText(link); $('#cp').textContent = 'Скопировано'; } catch (e) { const s = getSelection(), rg = document.createRange(); rg.selectNodeContents($('#studentLink')); s.removeAllRanges(); s.addRange(rg); $('#cp').textContent = 'Выдели и скопируй'; } };
+  $('#open').onclick = () => { if (link) location.href = link; };
+}
+
+/* ---------- student / room ---------- */
+function initStudent() {
+  const title = q.get('t') || 'Урок английского';
+  document.title = title;
+  $('#gtitle').textContent = title;
+  $('#rt').textContent = title;
+  $('#gate').hidden = false;
+  const saved = (() => { try { return localStorage.getItem('room-name') || ''; } catch (e) { return ''; } })();
+  $('#nm').value = saved;
+  $('#go').onclick = () => {
+    const name = $('#nm').value.trim();
+    if (!name) { $('#gerr').textContent = 'Напиши имя.'; return; }
+    try { localStorage.setItem('room-name', name); } catch (e) {}
+    $('#gate').hidden = true; $('#room').hidden = false;
+    startBoard(); if (/^https:\/\//.test(q.get('v') || '')) return startFrameVideo(); ((q.get('j') || (q.get('m') || VIDEO_MODE) === 'jitsi') ? startVideo : startP2P)(name);
+  };
+  $('#nm').addEventListener('keydown', e => { if (e.key === 'Enter') $('#go').click(); });
+  layoutButtons();
+}
+
+function startBoard() {
+  $('#ob').href = 'https://app.holst.so/share/b/' + b;
+  const f = document.createElement('iframe');
+  f.src = 'https://app.holst.so/share/b/' + b;
+  f.allow = 'fullscreen; clipboard-read; clipboard-write; camera; microphone';
+  f.allowFullscreen = true;
+  const box = $('#board');
+  const mob = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && screen.width < 1100);
+  const note = document.createElement('div');
+  note.style.cssText = 'position:absolute;left:0;right:0;bottom:0;z-index:5;background:#1b1f3a;color:#fff;padding:10px 14px;font:14px system-ui;display:flex;gap:10px;align-items:center;flex-wrap:wrap';
+  note.innerHTML = '<span style="flex:1;min-width:180px">Доска не появилась? На планшете и телефоне она может не открываться внутри страницы.</span><a href="https://app.holst.so/share/b/' + b + '" target="_blank" rel="noopener" style="background:#6d7bff;color:#fff;padding:10px 16px;border-radius:10px;text-decoration:none;font-weight:600">Открыть доску</a><button style="background:none;border:0;color:#fff;font-size:20px" aria-label="Закрыть">×</button>';
+  note.querySelector('button').onclick = () => note.remove();
+  box.style.position = 'relative';
+  box.append(f, note);
+  if (!mob) setTimeout(() => note.remove(), 8000);
+}
+
+function startFrameVideo() {
+  const v = q.get('v');
+  if (/(^|\.)zoom\.(us|com)$|\.zoom\.us$/i.test(new URL(v).hostname)) {
+    const box = $('#video');
+    box.innerHTML = '<div style="padding:20px;color:#fff;font:15px/1.5 system-ui;text-align:center"><p>Видеосвязь идёт в Zoom.</p><p><a href="' + v.replace(/"/g, '') + '" target="_blank" rel="noopener" style="display:inline-block;background:#2d8cff;color:#fff;padding:14px 22px;border-radius:12px;text-decoration:none;font-weight:700">Открыть Zoom</a></p><p style="opacity:.7;font-size:13px">На планшете: включи разделённый экран, Zoom в одной половине, доска в другой.</p></div>';
+    return;
+  }
+  const f = document.createElement('iframe');
+  f.src = v; f.allow = 'camera; microphone; autoplay; display-capture; fullscreen';
+  f.style.cssText = 'width:100%;height:100%;border:0';
+  const box = $('#video'); box.innerHTML = ''; box.append(f);
+  const a = document.createElement('a');
+  a.href = v; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'Открыть видео отдельно';
+  a.style.cssText = 'position:absolute;left:8px;bottom:8px;z-index:5;background:#1b1f3a;color:#fff;padding:6px 10px;border-radius:8px;font:12px system-ui;text-decoration:none';
+  box.style.position = 'relative'; box.append(a);
+}
+
+let api = null;
+function startVideo(name) {
+  const VD = q.get('j') || VIDEO_DOMAIN;
+  const box = $('#video');
+  const s = document.createElement('script');
+  s.src = 'https://' + VD + '/external_api.js';
+  s.onerror = () => { $('#vph').innerHTML = 'Не удалось загрузить видеосвязь.<br>Попробуй открыть видео отдельно: <a style="color:#9bb0ff" target="_blank" rel="noopener" href="https://' + VD + '/' + encodeURIComponent(r) + '">открыть комнату</a>'; };
+  s.onload = () => {
+    try {
+      api = new JitsiMeetExternalAPI(VD, {
+        roomName: r, parentNode: box, width: '100%', height: '100%', lang: 'ru',
+        userInfo: { displayName: name },
+        configOverwrite: { disableDeepLinking: true, prejoinConfig: { enabled: false }, startWithAudioMuted: false, startWithVideoMuted: false, disableInviteFunctions: true, toolbarButtons: ['microphone', 'camera', 'hangup', 'tileview', 'settings', 'fullscreen'] },
+        interfaceConfigOverwrite: { MOBILE_APP_PROMO: false, SHOW_JITSI_WATERMARK: false }
+      });
+      $('#vph').hidden = true;
+      api.addListener('readyToClose', () => { $('#vph').hidden = false; $('#vph').innerHTML = 'Связь завершена.<br><button class="btn" onclick="location.reload()">Подключиться снова</button>'; });
+    } catch (e) { $('#vph').textContent = 'Ошибка видеосвязи: ' + e.message; }
+  };
+  document.head.append(s);
+}
+
+/* ---------- P2P video (PeerJS) ---------- */
+function startP2P(name) {
+  const box = $('#video');
+  $('#vph').hidden = true;
+  box.insertAdjacentHTML('beforeend', '<div class="vwrap"><video id="rv" autoplay playsinline></video><video id="lv" autoplay playsinline muted></video><div id="vst">Подключаю камеру…</div><div id="vc"><button id="bm" title="Микрофон">🎤</button><button id="bc" title="Камера">📷</button></div></div>');
+  const info = { role: '-', sig: 'нет', ice: '-' };
+  let stext = '';
+  const st = t => { if (t != null) stext = t; $('#vst').textContent = stext + '\n[комната …' + r.slice(-4) + ' · роль ' + info.role + ' · сервер: ' + info.sig + ' · канал: ' + info.ice + ']'; };
+  const s = document.createElement('script');
+  s.src = 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
+  s.onerror = () => st('Не удалось загрузить видеосвязь. Проверь интернет и обнови страницу.');
+  s.onload = async () => {
+    let local = null;
+    try { local = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: { echoCancellation: true, noiseSuppression: true } }); }
+    catch (e) {
+      try { local = await navigator.mediaDevices.getUserMedia({ audio: true }); st('Камера недоступна, работает только звук.'); }
+      catch (e2) { st('Нет доступа к камере и микрофону. Нажми значок замка в адресной строке и разреши, затем обнови страницу.'); return; }
+    }
+    $('#lv').srcObject = local;
+    const track = k => local.getTracks().filter(t => t.kind === k);
+    $('#bm').onclick = e => { const on = track('audio').some(t => t.enabled); track('audio').forEach(t => t.enabled = !on); e.currentTarget.classList.toggle('off', on); };
+    $('#bc').onclick = e => { const on = track('video').some(t => t.enabled); track('video').forEach(t => t.enabled = !on); e.currentTarget.classList.toggle('off', on); };
+    const ice = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }, ...TURN_SERVERS] };
+    let peer = null, call = null, timer = null, dead = false;
+    const attach = c => {
+      call = c;
+      c.on('iceStateChanged', x => { info.ice = x; if (x === 'failed') st('Прямое соединение не вышло. Нужен TURN-сервер или другая сеть.'); else st(); });
+      c.on('stream', st2 => { $('#rv').srcObject = st2; $('#rv').play().catch(() => {}); st('На связи'); setTimeout(() => $('#vst').style.opacity = 0, 2500); });
+      c.on('close', () => { $('#rv').srcObject = null; $('#vst').style.opacity = 1; st('Собеседник вышел. Жду…'); call = null; if (role === 'b') dial(); });
+      c.on('error', () => { call = null; if (role === 'b') dial(); });
+    };
+    let role = 'a';
+    const mkPeer = id => new Peer(id, Object.assign({ config: ice, debug: 0 }, PEER_SERVER));
+    const dial = () => {
+      clearTimeout(timer);
+      if (dead || !peer || peer.destroyed || call) return;
+      const c = peer.call(r + '-a', local);
+      if (!c) { timer = setTimeout(dial, 3000); return; }
+      attach(c);
+      timer = setTimeout(() => { if (!$('#rv').srcObject && call === c) { try { c.close(); } catch (e) {} call = null; dial(); } }, 9000);
+    };
+    const start = (id) => {
+      info.role = role; info.sig = 'нет'; info.ice = '-';
+      st(role === 'a' ? 'Жду собеседника…' : 'Звоню…');
+      peer = mkPeer(id);
+      const cur = peer;
+      setTimeout(() => { if (cur === peer && info.sig === 'нет') { info.sig = 'нет ответа'; st('Нет связи с сервером соединения. Если включён VPN, выключи его или попробуй другую сеть. Обнови страницу.'); } }, 10000);
+      peer.on('open', () => { info.sig = 'ок'; st(); if (role === 'b') dial(); });
+      peer.on('call', c => { if (call) { try { call.close(); } catch (e) {} } c.answer(local); attach(c); });
+      peer.on('error', err => {
+        info.sig = 'ошибка: ' + err.type; st();
+        if (err.type === 'unavailable-id') {
+          try { peer.destroy(); } catch (e) {}
+          if (role === 'a') { role = 'b'; start(r + '-b'); } else { st('Комната занята. Повторяю…'); role = 'a'; setTimeout(() => start(r + '-a'), 4000); }
+        } else if (err.type === 'peer-unavailable') { st('Жду, пока собеседник войдёт…'); timer = setTimeout(dial, 3000); }
+        else if (err.type === 'network' || err.type === 'server-error' || err.type === 'socket-error' || err.type === 'socket-closed') { st('Нет связи с сервером. Повторяю…'); try { peer.destroy(); } catch (e) {} setTimeout(() => { role = 'a'; start(r + '-a'); }, 4000); }
+      });
+      peer.on('disconnected', () => { info.sig = 'обрыв'; st(); try { peer.reconnect(); } catch (e) {} });
+    };
+    start(r + '-a');
+    addEventListener('beforeunload', () => { dead = true; try { peer.destroy(); } catch (e) {} });
+  };
+  document.head.append(s);
+}
+
+/* ---------- layout ---------- */
+function layoutButtons() {
+  const st = $('#stage');
+  const set = l => {
+    st.className = l;
+    document.querySelectorAll('#bar [data-l]').forEach(x => x.classList.toggle('on', x.dataset.l === l));
+    try { localStorage.setItem('room-layout', l); } catch (e) {}
+  };
+  document.querySelectorAll('#bar [data-l]').forEach(x => x.onclick = () => set(x.dataset.l));
+  let l = 'side'; try { l = localStorage.getItem('room-layout') || 'side'; } catch (e) {}
+  set(['side', 'bottom', 'float', 'hide'].includes(l) ? l : 'side');
+  let w = 340;
+  $('#wider').onclick = () => { w = w >= 520 ? 260 : w + 90; st.style.setProperty('--vw', w + 'px'); st.style.setProperty('--vh', Math.min(60, 22 + (w - 260) / 6) + '%'); };
+  $('#fsb').onclick = async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); } catch (e) {} };
+  // drag floating video by the grip
+  const v = $('#video'), g = $('#grip');
+  let d = null;
+  g.addEventListener('pointerdown', e => { const rc = v.getBoundingClientRect(); d = { dx: e.clientX - rc.left, dy: e.clientY - rc.top }; g.setPointerCapture(e.pointerId); });
+  g.addEventListener('pointermove', e => { if (!d) return; v.style.left = Math.max(0, Math.min(innerWidth - 100, e.clientX - d.dx)) + 'px'; v.style.top = Math.max(0, Math.min(innerHeight - 60, e.clientY - d.dy)) + 'px'; v.style.right = 'auto'; v.style.bottom = 'auto'; });
+  g.addEventListener('pointerup', () => d = null);
+}
+</script>
+</body></html>
