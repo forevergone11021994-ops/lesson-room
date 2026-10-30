@@ -269,7 +269,19 @@ function startP2P(name) {
     const attach = c => {
       call = c;
       c.on('iceStateChanged', x => { info.ice = x; if (x === 'failed') st('Прямое соединение не вышло. Нужен TURN-сервер или другая сеть.'); else st(); });
-      c.on('stream', st2 => { $('#rv').srcObject = st2; $('#rv').play().catch(() => {}); st('На связи'); setTimeout(() => $('#vst').style.opacity = 0, 2500); });
+      c.on('stream', st2 => {
+        const rv = $('#rv'); rv.srcObject = st2;
+        const upd = () => { const v = st2.getVideoTracks().length, a = st2.getAudioTracks().length; st('На связи · у собеседника камера: ' + (v ? 'есть' : 'НЕТ') + ', звук: ' + (a ? 'есть' : 'НЕТ')); };
+        upd(); st2.onaddtrack = upd;
+        const ms = new MediaStream(); st2.getTracks().forEach(t => ms.addTrack(t));
+        try { c.peerConnection.addEventListener('track', ev => { if (!ms.getTracks().includes(ev.track)) ms.addTrack(ev.track); rv.srcObject = ms; rv.play().catch(() => {}); upd(); }); } catch (e) {}
+        rv.srcObject = ms;
+        rv.onloadedmetadata = () => rv.play().catch(() => {});
+        setTimeout(() => { const t = ms.getTracks().map(x => x.kind + ':' + x.readyState + (x.muted ? ':muted' : '')).join(', '); const d = $('#vst'); d.textContent += '\n[принято: ' + (t || 'ничего') + ' · картинка ' + rv.videoWidth + 'x' + rv.videoHeight + (rv.paused ? ' · пауза' : '') + ']'; d.style.opacity = 1; }, 4000);
+        rv.play().catch(() => { st('Нажми на видео, чтобы включить картинку и звук'); });
+        rv.onclick = () => { rv.play().catch(() => {}); };
+        setTimeout(() => { $('#vst').style.opacity = rv.paused ? 1 : 0.0; }, 6000);
+      });
       c.on('close', () => { $('#rv').srcObject = null; $('#vst').style.opacity = 1; st('Собеседник вышел. Жду…'); call = null; if (role === 'b') dial(); });
       c.on('error', () => { call = null; if (role === 'b') dial(); });
     };
